@@ -1,0 +1,165 @@
+# How log events are presented ON THE MAP: which icon, which colour, which
+# bearing, and what is not worth mapping at all.
+#
+# This is the hand-edited knob for map presentation — everything here was
+# previously hardcoded across emit/geojson.py and emit/map.py. Editing this file
+# is the supported way to change how a log event looks; no Python change needed.
+#
+# Structure
+#   layers:    per-layer defaults (icon, offset clock bearing, bulk-hide)
+#   events:    by SDK event name (from `*EventTx fire` / `onHeadlessEvent`)
+#   rules:     ordered regex rules, FIRST MATCH WINS, scoped to a layer
+#   suppress:  records that are never mapped, with the reason
+#   tints:     icon -> semantic colour
+#
+# Platform scoping: every `rules` and `suppress` entry may carry
+# `platform: android | ios`. Without it the entry applies to both. Platform
+# entries are evaluated BEFORE shared ones, so a platform can override.
+#
+# Icon names refer to emit/icons.py (vendored Lucide) or the hand-drawn
+# CUSTOM_ICONS in emit/map.py (traffic-go / traffic-stop).
+
+# Everything per-layer lives HERE — this block is the single definition, and
+# the order of its keys is the layer order (panel order, and the order layers
+# are built in). Fields:
+#   label            what the layer control calls it
+#   kind             how it draws: marker | line | dot | gap | launch
+#   glyph            emoji fallback, used in the digest/GeoJSON and by any
+#                    marker whose record carried no level-slot emoji of its own
+#   icon             vector icon (emit/icons.py) for markers and cluster discs
+#   clock            offset-marker bearing: a marker with no position of its
+#                    own always sits at this clock position from its anchor,
+#                    so position carries meaning (12 = launch, 6 = lifecycle)
+#   bulk_hide_above  starts hidden above this many features — routine volume
+#                    should not bury the route on first open
+layers:
+  track:        { label: Track,      kind: line,   glyph: "📍" }
+  fixes:        { label: Fixes,      kind: dot,    glyph: "📍" }
+  rejections:   { label: Rejections, kind: marker, glyph: "🚫", icon: rejection,      clock: 7 }
+  launch:       { label: App launch, kind: launch, glyph: "⚙️", icon: launch,         clock: 12 }
+  lifecycle:    { label: Lifecycle,  kind: marker, glyph: "☯️", icon: config,         clock: 6,  bulk_hide_above: 120 }
+  errors:       { label: Errors,     kind: marker, glyph: "‼️", icon: error,          clock: 3 }
+  warnings:     { label: Warnings,   kind: marker, glyph: "⚠️", icon: warning,        clock: 9 }
+  geofence:     { label: Geofence,   kind: marker, glyph: "📢", icon: geofence,       clock: 10 }
+  motionchange: { label: Motion,     kind: marker, glyph: "⚡", icon: motion-vehicle, clock: 5 }
+  http:         { label: HTTP,       kind: marker, glyph: "📶", icon: http,           clock: 2,  bulk_hide_above: 120 }
+  gaps:         { label: Gaps,       kind: gap,    glyph: "⏳", icon: gap }
+  mock:         { label: Mock,       kind: marker, glyph: "🐞", icon: mock,           clock: 11 }
+
+# SDK event names → icon. The event NAME is what matters; headless is a
+# modifier on delivery, never the event itself.
+events:
+  http:               { icon: http }
+  location:           { icon: route }
+  geofence:           { icon: geofence }
+  geofenceschange:    { icon: geofence }
+  motionchange:       { icon: motion-vehicle }
+  heartbeat:          { icon: heartbeat }
+  activitychange:     { icon: motion-foot }
+  providerchange:     { icon: provider }
+  connectivitychange: { icon: connectivity }
+  powersavechange:    { icon: power-save }
+  enabledchange:      { icon: launch }
+  schedule:           { icon: schedule }
+  locationerror:      { icon: warning }
+  locationfilter:     { icon: rejection }
+  terminate:          { icon: terminate }
+  boot:               { icon: launch }
+
+# Ordered; first match wins within a layer. `match` is a Python regex tested
+# against the whole record (header + body).
+rules:
+  # ── motion: the stop/start cycle, drawn as opposites ──────────────────────
+  - layer: motionchange
+    match: "Exit stationary region|didExitRegion|StationaryGeofenceReceiver"
+    icon: traffic-go
+    note: left the stationary fence — tracking resumes
+  - layer: motionchange
+    match: "stopTimeout fired|OneShot event fired: STOP_TIMEOUT|beginStopTimer"
+    icon: traffic-stop
+    note: stop timeout fired — the stationary fence is about to be created
+  - layer: motionchange
+    match: 'isMoving:\s*(?:false|0)\b|entered STATIONARY'
+    icon: stationary
+    stationary_region: true      # draw the 150 m fence at this position
+  - layer: motionchange
+    match: 'isMoving:\s*(?:true|1)\b|entered MOVING'
+    icon: motion-vehicle
+
+  # ── app state: awake vs asleep ────────────────────────────────────────────
+  - layer: lifecycle
+    match: 'onEnterForeground|applicationDidBecomeActive|onResume\b|onStart\b|Foreground \('
+    icon: foreground
+  - layer: lifecycle
+    match: 'onEnterBackground|applicationDidEnterBackground|onPause\b|onStop\b|Background \('
+    icon: background
+  - layer: lifecycle
+    match: "onAppTerminate|applicationWillTerminate|TERMINATE_EVENT"
+    icon: terminate
+  - layer: lifecycle
+    match: "HeadlessMode|onHeadless|headlessConfirmed"
+    icon: headless
+  - layer: lifecycle
+    match: 'onCreate\b'
+    icon: launch
+
+# Never mapped. Each entry says WHY, so a future reader can judge whether the
+# suppression is still right.
+suppress:
+  - match: "Motion-trigger timer|startMotionTriggerTimer|resetMotionTriggerTimer|MOTION_TRIGGER_DELAY|Motion-trigger ignored"
+    reason: internal timer bookkeeping, not a pace change (was 20 of 32 motion markers in one fixture)
+  - match: 'performStopDetection|mStoppedAtLocation == null'
+    when: mock_locations
+    reason: >-
+      expected while mock locations are injected — stop detection has no real
+      anchor, so these are noise, not a finding (966 of 1078 warnings in one
+      mock-route fixture)
+  - match: 'Mock location detected'
+    when: mock_locations
+    reason: >-
+      restates "this capture is a mock route" once per fix (998 markers in one
+      fixture); the capture-level fact is reported in the digest instead
+  - match: 'SCHEDULE_EXACT_ALARM is not granted|USE_EXACT_ALARM is restricted|Using in-exact alarm'
+    reason: >-
+      OS policy, not a defect — exact alarms are denied by default on Android
+      14+ and the SDK correctly degrades to inexact. Repeats per scheduled
+      alarm (61 in one fixture). Still reported in the digest.
+  - match: 'onWindowFocusChanged'
+    reason: >-
+      window focus flaps on every dialog, notification shade and keyboard —
+      UI chatter with no bearing on tracking. onEnterForeground/onEnterBackground
+      carry the app-state story.
+  - match: "GeofenceDAO updateState|Updated geofence state"
+    reason: DB bookkeeping for a transition already mapped (584 records in one fixture)
+  - match: "HeadlessMode\\?"
+    reason: consumed by the app-launch marker, which reports the headless state itself
+  # Authorization records are routine bookkeeping unless they describe a FAILURE;
+  # the failure patterns live in auth.problem below.
+  - classes: [TSLocationAuthorization, LocationAuthorization, PermissionManager]
+    unless_match: 'state:\s*(?:Denied|Restricted|NotDetermined|WhenInUse|Undetermined)|[Aa]uthorization (?:denied|restricted|failed|error)|Permission denied|denied by (?:the )?user|(?:location|background) permission (?:denied|revoked)|isAuthorizedForPolicy=0|kCLErrorDenied'
+    reason: routine auth state refresh; only denials/downgrades are events
+
+# Icon → semantic colour. green = tracking resumes, red = tracking parks or a
+# failure, amber = dwell / app foreground, indigo = app background.
+# A tint never overrides a genuine WARN/ERROR severity.
+tints:
+  traffic-go: green
+  traffic-stop: red
+  stationary-exit: green
+  motion-vehicle: green
+  motion-foot: green
+  launch: green
+  stop-timeout: red
+  stationary: red
+  geofence-suppressed: red
+  http-error: red
+  auth-problem: red
+  terminate: red
+  foreground: amber
+  background: indigo
+
+# Geofence transitions colour by action — the action IS the story.
+geofence_actions:
+  ENTER: green
+  EXIT: red
+  DWELL: amber

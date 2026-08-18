@@ -1,0 +1,79 @@
+# Hand-curated semantic layer — authorial intent, confirmed by Chris (2026-08-16).
+# This is the ONLY hand-maintained vocabulary file; everything else is harvested.
+
+# Level-slot icon meanings, per platform and version range. The 2026-08
+# standardization (android a95f31a / ios 66d7b9c, ships after android 4.5.0 /
+# ios 4.4.3) retired ❌ and 🎾: ERROR=‼️, CANCEL=🚫, ON=🟢 on both platforms.
+icon_semantics:
+  android:
+    - { icon: "⚠",  semantic: warn,    family: severity }
+    - { icon: "‼",  semantic: error,   family: severity }
+    - { icon: "ℹ",  semantic: info,    family: severity }
+    - { icon: "🔵", semantic: notice,  family: severity }   # routine action — skim tier
+    - { icon: "✅", semantic: ok,      family: state }
+    - { icon: "🔴", semantic: "off",   family: state }      # OFF, not error
+    - { icon: "🟢", semantic: "on",    family: state, valid_from: "4.5.1" }
+    - { icon: "🎾", semantic: "on",    family: state, valid_to: "4.5.0" }   # was always meant as a green circle
+    - { icon: "🚫", semantic: cancel,  family: state, valid_from: "4.5.1" }
+    - { icon: "❌", semantic: cancel,  family: state, valid_to: "4.5.0" }   # NOTE: cancel on Android, error on iOS
+    - { icon: "⏰", semantic: alarm,   family: domain }
+    - { icon: "⏳", semantic: waiting, family: domain }
+    - { icon: "📶", semantic: connectivity, family: domain }
+    - { icon: "🚘", semantic: activity, family: domain }
+    - { icon: "📍", semantic: location, family: domain }
+    - { icon: "📅", semantic: schedule, family: domain }
+  ios:
+    - { icon: "⚠",  semantic: warn,    family: severity }
+    - { icon: "‼",  semantic: error,   family: severity, valid_from: "4.4.4" }
+    - { icon: "❌", semantic: error,   family: severity, valid_to: "4.4.3" }
+    - { icon: "🔵", semantic: notice,  family: severity }   # covers Info/Debug/Verbose/Notice — text export is level-blind
+    - { icon: "✅", semantic: ok,      family: state }
+    - { icon: "🟢", semantic: "on",    family: state }
+    - { icon: "🔴", semantic: "off",   family: state }
+    - { icon: "🚫", semantic: cancel,  family: state }
+    - { icon: "⏰", semantic: timer,   family: domain }
+    - { icon: "📌", semantic: pinned,  family: domain }     # notable metric (filter decisions)
+    - { icon: "📌🔒", semantic: auth,  family: domain }
+    - { icon: "⚡",  semantic: event,  family: domain }     # event-bus dispatch
+    - { icon: "🆘", semantic: novel_marker, family: domain } # NO emergency meaning — dev-time "stick out" marker
+
+# Stable body-emoji hints (author-confirmed). Rare/unusual emoji not listed here
+# mean "recently developed code path" — surface as novel_marker, never as severity.
+body_emoji_hints:
+  "⚙": fgs_lifecycle          # FGS service lifecycle
+  "☯": app_lifecycle          # foreground/background transitions
+  "🛃": fgs_launch_gate
+  "💀": headless               # app running headless (MainActivity destroyed) — important
+  "⚡": event_dispatch
+  "❤": heartbeat
+  "💾": persistence
+  "🐞": mock_debug
+  "📢": geofence_announce
+  "🛑": stop
+  "🔎": query
+  "⏱": timing
+  "🧹": cleanup
+  "⏸": delivery_pause
+  "▶": delivery_resume
+  "🛜": event_manager
+
+# Category rules: first match wins (checked top to bottom against
+# "<tag_class>.<tag_method>" then against body hints/semantics). Categories are
+# the digest sections and map layers.
+categories:
+  - { match_class: "TSAppState|LifecycleManager",             category: lifecycle }
+  - { match_body_hint: app_lifecycle,                         category: lifecycle }
+  - { match_body_hint: headless,                              category: lifecycle }
+  - { match_class: "TSGeofence.*|GeofencingProcessor|GeofenceDAO|StationaryGeofence.*|GeofencingService", category: geofence }
+  - { match_class: ".*Http.*",                                category: http }
+  - { match_class: "TSLocationManager|TrackingService|TSTrackingService|SingleLocationRequest|TSSingleLocationRequest|TSLocationRequestService|SlcLocationProvider|TSLocationFilter|LocationFilter.*|Odometer|TSOdometer", category: location }
+  - { match_class: "TSMotionDetector|.*MotionActivity.*|ActivityRecognition.*",   category: motion }
+  - { match_class: "TSLocationAuthorization|PermissionManager",                   category: auth }
+  - { match_class: "TSScheduleManager|ScheduleService|ScheduleAlarmReceiver",     category: scheduler }
+  - { match_class: "FgsLaunchGate|AbstractService|.*Service",                     category: services }
+  - { match_class: "SQLiteLocationDAO|TSDataStore|DataStore",                     category: persistence }
+  - { match_class: "TSHeartbeatService|HeartbeatService",                         category: power }
+  - { match_class: "DeviceSettings.*|TSBackgroundTaskManager|BackgroundTaskManager", category: power }
+  - { match_class: "TSConfig|TSLog|LoggerFacade.*",                               category: system }
+  - { match_body_hint: event_manager,                                             category: events }
+  - { match_class: "EventManager|HeadlessEventTx|TSEventManager",                 category: events }
