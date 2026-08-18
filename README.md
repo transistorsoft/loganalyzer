@@ -55,8 +55,11 @@ BackgroundGeolocation.emailLog("you@example.com");
 ### Analyze
 
 ```bash
-loganalyzer <files...> [--out DIR] [--map] [--open] [--locations] [--year YYYY]
+loganalyzer <files...> [--out DIR] [--open] [--no-map] [--locations] [--year YYYY]
 ```
+
+A map is written by default — analyzing a tracking log without one is rarely
+what you want. `--open` also views it; `--no-map` skips it.
 
 Platform is grammar-sniffed, not guessed from the filename. Duplicates and unrecognized
 files are skipped with a note.
@@ -64,8 +67,8 @@ files are skipped with a note.
 | flag | effect |
 |---|---|
 | `--out DIR` | output root (default `loganalyzer-out/`); one subfolder per input |
-| `--map` | also write `map.html` |
-| `--open` | open each map in a browser tab (implies `--map`) |
+| `--map` / `--no-map` | write `map.html` — **on by default** |
+| `--open` | open each map in a browser tab |
 | `--locations` | also write `locations.geojson` |
 | `--year YYYY` | base year for Android's year-less timestamps (inferred otherwise) |
 | `--no-redact` | disable pseudonymization — local drill-down only |

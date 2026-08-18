@@ -36,8 +36,8 @@ nothing. **The map is a local instrument: it plots exactly where the device went
 ## Flags
 
 ```
---open          render the map and open it in a browser (implies --map)
---map           write map.html
+--open          open the map in a browser
+--no-map        skip the map (it is written by default)
 --locations     write locations.geojson
 --out DIR       output root (default: ./loganalyzer-out)
 --slice "<ts>±<N>[s|m]"   print the raw records around a moment instead

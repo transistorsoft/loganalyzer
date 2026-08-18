@@ -30,6 +30,16 @@ from .structs import annotate
 
 VOCAB_DIR = Path(__file__).parent / "vocabulary"
 
+def _package_version() -> str:
+    """Installed version, for --version. Reported by anyone filing a bug, so it
+    reads from the installed metadata rather than a second hardcoded string."""
+    from importlib.metadata import PackageNotFoundError, version
+    try:
+        return version("transistorsoft-loganalyzer")
+    except PackageNotFoundError:
+        return "unknown (not installed as a package)"
+
+
 def _map_subtitle(analysis) -> str:
     """SDK version · device · app id for the map title bar. Many customer logs
     are mid-session exports with no launch banner, so each part is included
@@ -184,7 +194,7 @@ def _cmd_parse(args: argparse.Namespace) -> int:
     matcher = Matcher(vocab)
 
     out_root = Path(args.out)
-    want_map = args.map or args.open_browser      # --open with nothing to open is a typo
+    want_map = args.map or args.open_browser      # --open always implies a map
     any_output = False
     maps: list[Path] = []
     for source in sources:
@@ -223,6 +233,10 @@ def _cmd_parse(args: argparse.Namespace) -> int:
         print(f"{source.path.name}: {len(records)} records, {len(segments)} segment(s), "
               f"{n_unknown} unknown ({100 * n_unknown / max(len(records), 1):.1f}%) → {out_dir}/",
               file=sys.stderr)
+        # A map nobody looks at is half the point. Name it, and name the flag
+        # that opens it — that is the moment someone wants to know.
+        if want_map and not args.open_browser and (out_dir / "map.html").exists():
+            print(f"  map: {out_dir / 'map.html'}  (add --open to view it)", file=sys.stderr)
         any_output = True
 
     if args.open_browser:
@@ -235,9 +249,16 @@ def main(argv: list[str] | None = None) -> int:
 
     parser = argparse.ArgumentParser(prog="loganalyzer", description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--version", action="version",
+                        version=f"loganalyzer {_package_version()}")
     parser.add_argument("files", nargs="*", help="log files (.log/.log.gz) or transistor_log.db")
     parser.add_argument("--out", default="loganalyzer-out", help="output directory root")
-    parser.add_argument("--map", action="store_true", help="emit map.html (LOCAL-ONLY: full precision)")
+    # Mapping is the point of the tool, so it is the default — and it always
+    # was in analyze_files(); only this flag disagreed. --no-map is kept for the
+    # cases that genuinely do not want it: a pipeline reading digest.json, or
+    # deliberately not creating a full-precision artifact at all.
+    parser.add_argument("--map", action=argparse.BooleanOptionalAction, default=True,
+                        help="write map.html (default: on; LOCAL-ONLY, full precision)")
     parser.add_argument("--open", dest="open_browser", action="store_true",
                         help="open each map in a browser tab (implies --map)")
     parser.add_argument("--locations", action="store_true", help="emit locations.geojson (LOCAL-ONLY)")

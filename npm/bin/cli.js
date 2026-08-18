@@ -22,7 +22,7 @@ const path = require("node:path");
 // Pinned so `npx @transistorsoft/loganalyzer@x` is reproducible: a floating
 // Python version would make the npm version a lie about what actually runs.
 const PY_PACKAGE = "transistorsoft-loganalyzer";
-const PY_VERSION = "0.1.1";
+const PY_VERSION = "0.1.2";
 const UV_VERSION = "0.12.5";
 
 const TARGETS = {

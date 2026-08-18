@@ -85,3 +85,41 @@ jobs:
         # No `with:` block — it detects OIDC from id-token: write, and attaches
         # PEP 740 attestations so an installer can verify these artifacts came
         # from this workflow.
+
+  npm:
+    # Separate job, and deliberately AFTER pypi: the launcher pins the PyPI
+    # version it invokes, so publishing it first would ship an npm package
+    # pointing at a version that does not exist yet.
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write        # provenance attestation
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: npm version must match the tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        working-directory: npm
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          tag="${GITHUB_REF_NAME#v}"
+          [ "$version" = "$tag" ] || {
+            echo "::error::tag $GITHUB_REF_NAME declares $tag but npm/package.json says $version"
+            exit 1
+          }
+
+      - name: publish
+        working-directory: npm
+        run: npm publish --provenance --access public
+        env:
+          # The one stored credential in this workflow. npm supports Trusted
+          # Publishing (OIDC) the way PyPI does — configure it on the package's
+          # npmjs.com settings, then delete these two lines and the secret. It
+          # needs the package to already exist, which is why it is not the
+          # starting point here.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
