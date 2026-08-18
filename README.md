@@ -58,8 +58,10 @@ BackgroundGeolocation.emailLog("you@example.com");
 loganalyzer <files...> [--out DIR] [--open] [--no-map] [--locations] [--year YYYY]
 ```
 
-A map is written by default — analyzing a tracking log without one is rarely
-what you want. `--open` also views it; `--no-map` skips it.
+A map is written **and opened** by default — analyzing a tracking log and not
+looking at it is rarely what you want. Opening is skipped automatically when
+output is piped or there is no terminal, so scripts and CI stay quiet.
+`--no-open` writes without viewing; `--no-map` skips the map entirely.
 
 Platform is grammar-sniffed, not guessed from the filename. Duplicates and unrecognized
 files are skipped with a note.
@@ -68,7 +70,7 @@ files are skipped with a note.
 |---|---|
 | `--out DIR` | output root (default `loganalyzer-out/`); one subfolder per input |
 | `--map` / `--no-map` | write `map.html` — **on by default** |
-| `--open` | open each map in a browser tab |
+| `--open` / `--no-open` | open the map — **on by default in a terminal**, off when piped or in CI |
 | `--locations` | also write `locations.geojson` |
 | `--year YYYY` | base year for Android's year-less timestamps (inferred otherwise) |
 | `--no-redact` | disable pseudonymization — local drill-down only |

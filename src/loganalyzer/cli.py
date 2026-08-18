@@ -183,6 +183,15 @@ def _run_slice(records: list[Record], spec: str, redactor: Redactor) -> str:
     return redact_slice(hits, redactor)
 
 
+def _interactive() -> bool:
+    """Is there a person to show a browser tab to? stderr, because that is where
+    the progress output goes — stdout may be piped while a human still watches."""
+    try:
+        return sys.stderr.isatty()
+    except (AttributeError, ValueError):
+        return False
+
+
 def _cmd_parse(args: argparse.Namespace) -> int:
     paths = [Path(p) for p in args.files]
     for p in paths:
@@ -194,6 +203,8 @@ def _cmd_parse(args: argparse.Namespace) -> int:
     matcher = Matcher(vocab)
 
     out_root = Path(args.out)
+    if args.open_browser is None:
+        args.open_browser = _interactive()
     want_map = args.map or args.open_browser      # --open always implies a map
     any_output = False
     maps: list[Path] = []
@@ -236,7 +247,7 @@ def _cmd_parse(args: argparse.Namespace) -> int:
         # A map nobody looks at is half the point. Name it, and name the flag
         # that opens it — that is the moment someone wants to know.
         if want_map and not args.open_browser and (out_dir / "map.html").exists():
-            print(f"  map: {out_dir / 'map.html'}  (add --open to view it)", file=sys.stderr)
+            print(f"  map: {out_dir / 'map.html'}", file=sys.stderr)
         any_output = True
 
     if args.open_browser:
@@ -259,8 +270,14 @@ def main(argv: list[str] | None = None) -> int:
     # deliberately not creating a full-precision artifact at all.
     parser.add_argument("--map", action=argparse.BooleanOptionalAction, default=True,
                         help="write map.html (default: on; LOCAL-ONLY, full precision)")
-    parser.add_argument("--open", dest="open_browser", action="store_true",
-                        help="open each map in a browser tab (implies --map)")
+    # On when a human is watching, off when nothing can look at it. A CLI that
+    # spawns browser tabs inside CI or a batch script is obnoxious; one that
+    # renders a map and then tells you how to open it is a half-step. The TTY
+    # check separates those two cases instead of picking a side.
+    parser.add_argument("--open", dest="open_browser",
+                        action=argparse.BooleanOptionalAction, default=None,
+                        help="open each map in a browser (default: on when "
+                             "attached to a terminal)")
     parser.add_argument("--locations", action="store_true", help="emit locations.geojson (LOCAL-ONLY)")
     parser.add_argument("--slice", help="print records around '<ts>±<N>[s|m]' instead of writing outputs")
     parser.add_argument("--no-redact", action="store_true",

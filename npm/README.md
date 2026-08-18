@@ -5,8 +5,10 @@ SDK logs. Turns an iOS or Android capture into a **digest** — what happened, w
 wrong — and an **interactive map**.
 
 ```bash
-npx @transistorsoft/loganalyzer background-geolocation.log.gz --open
+npx @transistorsoft/loganalyzer background-geolocation.log.gz
 ```
+
+Renders the map and opens it.
 
 No Python, no toolchain, nothing to install. If you have `npx`, you have this.
 
@@ -36,8 +38,8 @@ nothing. **The map is a local instrument: it plots exactly where the device went
 ## Flags
 
 ```
---open          open the map in a browser
---no-map        skip the map (it is written by default)
+--no-open       write the map without opening it (opens by default in a terminal)
+--no-map        skip the map entirely (it is written by default)
 --locations     write locations.geojson
 --out DIR       output root (default: ./loganalyzer-out)
 --slice "<ts>±<N>[s|m]"   print the raw records around a moment instead
