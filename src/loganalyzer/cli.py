@@ -81,6 +81,35 @@ def _emit_outputs(source: Source, records, analysis, out_dir: Path, *,
     return out_dir
 
 
+def protect_output_dir(out_root: Path) -> None:
+    """Make a freshly created output root invisible to git.
+
+    Everything written here is full-precision location data — a map plots
+    exactly where the device went, and aliases.local.json un-redacts the digest
+    beside it. The default output root is `./loganalyzer-out` in the CURRENT
+    directory, which for anyone running this on their own logs is usually a git
+    repository, and their .gitignore has never heard of us.
+
+    So the directory ignores itself, the way uv does for `dist/`. Nobody has to
+    know, and nothing has to be remembered.
+
+    Only written when this run CREATED the directory. Never drop a `*` ignore
+    into a directory that already existed — `--out .` would otherwise make the
+    caller's entire repository invisible.
+    """
+    marker = out_root / ".gitignore"
+    if marker.exists():
+        return
+    out_root.mkdir(parents=True, exist_ok=True)
+    marker.write_text(
+        "# Created by loganalyzer.\n"
+        "# These files carry FULL-PRECISION location data: map.html plots exactly\n"
+        "# where the device went, and aliases.local.json un-redacts digest.md.\n"
+        "# Not for committing, attaching to an issue, or sharing.\n"
+        "*\n",
+        encoding="utf-8")
+
+
 def open_maps(maps: list[Path]) -> None:
     """Open rendered maps in the browser. One implementation for every command
     that offers --open, so the two paths cannot drift apart."""
@@ -105,6 +134,8 @@ def analyze_files(paths: list[Path], out_root: Path, *,
     vocab = Vocabulary.load(VOCAB_DIR)
     matcher = Matcher(vocab)
     maps: list[Path] = []
+    if not out_root.exists():
+        protect_output_dir(out_root)
     for source in load_sources(paths):
         if source.duplicate_of is not None or source.platform == "unknown" \
                 or source.kind == "db":
@@ -203,6 +234,7 @@ def _cmd_parse(args: argparse.Namespace) -> int:
     matcher = Matcher(vocab)
 
     out_root = Path(args.out)
+    fresh_root = not out_root.exists()
     if args.open_browser is None:
         args.open_browser = _interactive()
     want_map = args.map or args.open_browser      # --open always implies a map
@@ -231,6 +263,9 @@ def _cmd_parse(args: argparse.Namespace) -> int:
         # One emit path for both commands (analyze_files) so outputs can never
         # drift apart — a duplicated call site here previously dropped the map
         # subtitle from `loganalyzer <file> --map`.
+        if fresh_root:
+            protect_output_dir(out_root)
+            fresh_root = False
         out_dir = _emit_outputs(source, records, analysis, out_root / label,
                                 want_map=want_map, want_geojson=args.locations,
                                 redact=not args.no_redact,

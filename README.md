@@ -97,6 +97,11 @@ popup shows a copy-ready `--slice` string for the record it describes.
 | `map.html` | interactive map | ❌ full-precision coordinates |
 | `locations.geojson` | raw layer geometry | ❌ full-precision coordinates |
 
+Output lands in `./loganalyzer-out/` unless you pass `--out`. A freshly created
+output directory gets its own `.gitignore` containing `*`, so running this inside
+a repository cannot commit somebody's movements by accident. An output directory
+that already existed is never modified.
+
 Redaction is **pseudonymizing, not deleting**: coordinates become `COORD-A`, fences `GF-1`,
 packages `PKG-1`, devices `DEV-1`, URLs `URL-1`. The same real value always gets the same
 alias, so the digest still reads as a coherent story — "the device left `GF-1` at `COORD-A`"

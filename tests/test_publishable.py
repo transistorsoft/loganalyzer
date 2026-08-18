@@ -142,3 +142,35 @@ def test_npm_launcher_verifies_what_it_downloads():
     assert "checksum mismatch" in cli
     # pinned uv, not "latest" — a moving target defeats the pin above
     assert re.search(r'UV_VERSION = "\d+\.\d+\.\d+"', cli)
+
+
+# ── output is self-ignoring ───────────────────────────────────────────────────
+
+def test_fresh_output_root_ignores_itself(tmp_path):
+    """Everything written is full-precision location data, and the default
+    output root is ./loganalyzer-out in the CALLER's directory — usually a git
+    repo whose .gitignore has never heard of this tool. So the directory ignores
+    itself, the way uv does for dist/."""
+    from loganalyzer.cli import protect_output_dir
+
+    root = tmp_path / "loganalyzer-out"
+    protect_output_dir(root)
+    body = (root / ".gitignore").read_text()
+    assert body.strip().splitlines()[-1] == "*"
+    assert "FULL-PRECISION" in body
+
+
+def test_existing_output_root_is_never_clobbered(tmp_path):
+    """`--out .` must not drop a `*` ignore into a directory that already
+    exists — that would make the caller's whole repository invisible to git."""
+    from loganalyzer.cli import protect_output_dir
+
+    existing = tmp_path / "repo"
+    existing.mkdir()
+    (existing / "src.txt").write_text("keep me")
+    # a pre-existing .gitignore must survive untouched
+    (existing / ".gitignore").write_text("node_modules/\n")
+
+    protect_output_dir(existing)
+    assert (existing / ".gitignore").read_text() == "node_modules/\n"
+    assert (existing / "src.txt").read_text() == "keep me"

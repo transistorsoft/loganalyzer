@@ -31,6 +31,10 @@ One folder per log:
 | `digest.json` | same analysis, machine-readable | ❌ full precision |
 | `map.html` | interactive map | ❌ full-precision coordinates |
 
+Output goes to `./loganalyzer-out/` unless you pass `--out`. A directory this
+tool creates ignores itself (`.gitignore` containing `*`), so running it inside
+your project cannot accidentally commit your users' locations.
+
 Coordinates in `digest.md` become `COORD-A`, geofences `GF-1`, and so on — the same real
 value always gets the same alias, so it still reads as a coherent story while identifying
 nothing. **The map is a local instrument: it plots exactly where the device went.**
