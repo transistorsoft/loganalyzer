@@ -12,6 +12,8 @@ you something you can paste into an issue.
 uvx transistorsoft-loganalyzer background-geolocation.log.gz --open
 ```
 
+No Python setup required — see below.
+
 ---
 
 ## Install
@@ -23,10 +25,17 @@ brings its own:
 # one-off, nothing installed
 uvx transistorsoft-loganalyzer <file> --open
 
-# or install the command
+# equivalent, and the form to use if you pin a version
+uvx --from transistorsoft-loganalyzer loganalyzer <file> --open
+
+# or install it, which puts `loganalyzer` on your PATH
 uv tool install transistorsoft-loganalyzer
 loganalyzer <file> --open
 ```
+
+The package installs two identical commands: `loganalyzer` (what you will
+normally type) and `transistorsoft-loganalyzer` (so the `uvx <package>`
+shorthand resolves).
 
 If you already run Python 3.11+, `pipx install transistorsoft-loganalyzer` works too.
 

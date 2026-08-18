@@ -1,6 +1,6 @@
 [project]
 name = "transistorsoft-loganalyzer"
-version = "0.1.0"
+version = "0.1.1"
 description = "Triage Background Geolocation SDK logs: parse an iOS or Android capture into a redacted digest and an interactive map"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -32,6 +32,11 @@ Issues = "https://github.com/transistorsoft/loganalyzer/issues"
 
 [project.scripts]
 loganalyzer = "loganalyzer.cli:main"
+# Alias matching the distribution name. `uvx <pkg>` only resolves an executable
+# whose name equals the package name, so without this the shorthand fails with
+# "The executable `transistorsoft-loganalyzer` was not found" — which no local
+# testing can catch, because locally you always run `loganalyzer` directly.
+transistorsoft-loganalyzer = "loganalyzer.cli:main"
 
 [dependency-groups]
 dev = [
