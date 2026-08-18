@@ -1,10 +1,15 @@
 name: release
 
 # Publishing is credential-free: PyPI trusts this repository + this workflow
-# file + the `pypi` environment via OIDC (Trusted Publishing), so there is no
-# API token stored anywhere. The publisher registration on PyPI names
-# `release.yml` explicitly — renaming this file breaks publishing until the
-# registration is updated to match.
+# file via OIDC (Trusted Publishing), so there is no API token stored anywhere.
+# The publisher registration on PyPI names `release.yml` explicitly — renaming
+# this file breaks publishing until the registration is updated to match.
+#
+# Deliberately no `environment:`. GitHub Environments are unavailable on this
+# org's plan (the settings page and the REST API both 404 across every repo,
+# with admin rights and repo scope), so requiring one would put an untestable
+# unknown on the credential path. PyPI treats the environment as an optional
+# extra constraint, so the registration omits it too — the two must agree.
 
 on:
   push:
@@ -36,7 +41,6 @@ jobs:
   publish:
     needs: test
     runs-on: ubuntu-latest
-    environment: pypi        # must match the Trusted Publisher registration
     permissions:
       id-token: write        # mint the OIDC token PyPI verifies
     steps:
