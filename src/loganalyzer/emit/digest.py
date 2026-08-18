@@ -289,13 +289,19 @@ def _jsonify(obj: Any) -> Any:
 # ═════════════════════════════════════════════════════════════════════════════
 
 def render_markdown(analysis: Analysis, redact: bool = True, *,
-                    redactor: Optional[Redactor] = None) -> str:
+                    redactor: Optional[Redactor] = None,
+                    harvest_versions: Optional[dict] = None) -> str:
     """Render the digest. ``redact`` governs pseudonymization of everything
     EXCEPT the config url + authorization values, which are always masked.
 
     A shared ``redactor`` may be passed (e.g. pre-loaded with geofence
     identifiers from records, or shared with ``redact_slice`` so aliases line
     up across artifacts); its ``enabled`` flag is set from ``redact``.
+
+    ``harvest_versions`` (platform -> SDK version, from Vocabulary) says which
+    release the source line numbers were harvested at, so the digest can state
+    what its `file:line` links are accurate FOR. Omitted when unknown, and
+    irrelevant when no links are present at all.
     """
     red = redactor if redactor is not None else Redactor(enabled=redact)
     red.enabled = redact
@@ -308,7 +314,7 @@ def render_markdown(analysis: Analysis, redact: bool = True, *,
     out += _sec_title(analysis, red)
     out += _sec_header(analysis, red)
     out += _sec_timeline(analysis, red)
-    out += _sec_warnings_errors(analysis, red)
+    out += _sec_warnings_errors(analysis, red, harvest_versions)
     out += _sec_health(analysis, red)
     out += _sec_end_state(analysis, red)
     out += _sec_anomalies(analysis, red)
@@ -520,13 +526,59 @@ def _group_lines(g: DedupGroup, red: Redactor) -> list[str]:
     return out
 
 
-def _sec_warnings_errors(a: Analysis, red: Redactor) -> list[str]:
+_LINE_REF = re.compile(r"/.*:\d+$")
+
+
+def _is_line_ref(site: str) -> bool:
+    return bool(_LINE_REF.search(site))
+
+
+def _source_link_note(a: Analysis, harvest_versions: Optional[dict]) -> list[str]:
+    """One line saying what a `file:line` link is accurate for.
+
+    A source link is a call SITE. The line number holds at the release it was
+    harvested from; between releases the code above it moves, so on an older
+    capture the line can land somewhere unrelated — an answer that is confident,
+    specific and wrong. Said once here rather than stamped on every link,
+    because 83-94% of entries are current and would repeat the same string.
+
+    Silent when there are no links to qualify: a public install carries no
+    source map, and a note about links you cannot see is just confusing.
+    """
+    if not harvest_versions:
+        return []
+    # Only when there are LINE references to qualify. Without the source map,
+    # sites fall back to the vocabulary entry id (VocabEntry.handle) — still a
+    # useful symbolic call site, but nothing a line number applies to, so a note
+    # about line accuracy would be answering a question nobody asked.
+    groups = list(a.error_groups) + list(a.warning_groups)
+    if not any(_is_line_ref(site) for g in groups for site in g.sites):
+        return []
+    # Only this capture's platform: citing the Android harvest on an iOS log is
+    # noise, and invites the reader to compare the wrong pair of versions.
+    plat = (a.header.platform or "").lower()
+    relevant = {k: v for k, v in harvest_versions.items() if k.lower() == plat} \
+        or harvest_versions
+    at = " / ".join(f"{k} {v}" for k, v in sorted(relevant.items()))
+    seen = [v for v in (a.header.sdk_versions or []) if v]
+    mine = f" This capture reports {' / '.join(seen)}." if seen else ""
+    return [
+        f"> Source links are line-accurate as of **{at}**.{mine} A link is a call "
+        f"*site*: if the capture is older, read the file at that release and "
+        f"locate the call by its literal rather than jumping to the line.",
+        "",
+    ]
+
+
+def _sec_warnings_errors(a: Analysis, red: Redactor,
+                         harvest_versions: Optional[dict] = None) -> list[str]:
     out = ["## Warnings & Errors", ""]
     e_total = sum(g.count for g in a.error_groups)
     w_total = sum(g.count for g in a.warning_groups)
     out.append(f"Errors: {len(a.error_groups)} groups / {e_total:,} records · "
                f"Warnings: {len(a.warning_groups)} groups / {w_total:,} records")
     out.append("")
+    out += _source_link_note(a, harvest_versions)
     if a.error_groups:
         shown = a.error_groups[:MAX_ERROR_GROUPS]
         title = "### Errors" + (f" (top {len(shown)} of {len(a.error_groups)} groups)"

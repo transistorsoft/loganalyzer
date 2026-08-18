@@ -405,3 +405,38 @@ def test_fixture_big_ios_digest_size():
     assert 60 <= n <= 700, f"digest size out of range: {n} lines"
     assert not _leaks_coordinates(md)
     assert "## Health" in md
+
+
+# ── source-link provenance note ──────────────────────────────────────────────
+
+def test_source_link_note_only_when_there_are_line_refs():
+    """The note qualifies `file:line` links. Without the private source map the
+    sites fall back to vocabulary entry ids — symbolic, useful, and nothing a
+    line number applies to — so the note must stay quiet."""
+    from loganalyzer.emit.digest import _source_link_note
+
+    class G:
+        def __init__(self, sites): self.sites = sites
+
+    class H:
+        platform = "ios"
+        sdk_versions = ["4.4.2"]
+
+    class A:
+        header = H()
+        def __init__(self, sites): self.error_groups, self.warning_groups = [], [G(sites)]
+
+    versions = {"ios": "4.4.4", "android": "4.5.0"}
+
+    # file:line present -> note, naming ONLY this capture's platform
+    note = _source_link_note(A(["native/ios/TSLocationManager/Util/Foo.m:367"]), versions)
+    assert note and "ios 4.4.4" in note[0]
+    assert "android" not in note[0]          # citing the other platform is noise
+    assert "4.4.2" in note[0]                # and it names the capture's own version
+
+    # symbolic entry-id sites -> silent
+    assert _source_link_note(A(["TSLocationMetricsEngine.computeFor:previous:#2"]), versions) == []
+    # no sites at all -> silent
+    assert _source_link_note(A([]), versions) == []
+    # no harvest metadata -> silent
+    assert _source_link_note(A(["native/ios/Foo.m:1"]), None) == []

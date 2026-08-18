@@ -46,13 +46,14 @@ def _map_subtitle(analysis) -> str:
 
 def _emit_outputs(source: Source, records, analysis, out_dir: Path, *,
                   want_map: bool = True, want_geojson: bool = False,
-                  redact: bool = True) -> Path:
+                  redact: bool = True, harvest_versions: dict | None = None) -> Path:
     """Write digest(+json+aliases), optional geojson and map for one source.
     The single emit path shared by every command."""
     out_dir.mkdir(parents=True, exist_ok=True)
     redactor = Redactor(enabled=redact)
     (out_dir / "digest.md").write_text(
-        render_markdown(analysis, redact=redact, redactor=redactor))
+        render_markdown(analysis, redact=redact, redactor=redactor,
+                        harvest_versions=harvest_versions))
     (out_dir / "digest.json").write_text(
         json.dumps(render_json(analysis), indent=1, default=str))
     if redactor.mapping():
@@ -103,7 +104,8 @@ def analyze_files(paths: list[Path], out_root: Path, *,
                                                 excerpt=is_excerpt)
         out_dir = _emit_outputs(source, records, analysis,
                                 out_root / source.path.stem.replace(" ", "_"),
-                                want_map=want_map, redact=redact)
+                                want_map=want_map, redact=redact,
+                                harvest_versions=vocab.harvest_versions)
         mp = out_dir / "map.html"
         if want_map and mp.exists():
             # Only worth a browser tab if there is a route to look at: a
@@ -210,7 +212,8 @@ def _cmd_parse(args: argparse.Namespace) -> int:
         # subtitle from `loganalyzer <file> --map`.
         out_dir = _emit_outputs(source, records, analysis, out_root / label,
                                 want_map=want_map, want_geojson=args.locations,
-                                redact=not args.no_redact)
+                                redact=not args.no_redact,
+                                harvest_versions=vocab.harvest_versions)
         # Unlike `issue --open`, which sifts whatever a thread happened to
         # contain, these files were named explicitly: open every map that got
         # written rather than second-guessing which are worth a tab.

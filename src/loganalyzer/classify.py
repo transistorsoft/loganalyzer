@@ -301,10 +301,15 @@ class Vocabulary:
     def __init__(self,
                  entries: list[VocabEntry] | None = None,
                  semantics: dict[str, Any] | None = None,
-                 build_map: dict[str, str] | None = None):
+                 build_map: dict[str, str] | None = None,
+                 harvest_versions: dict[str, str] | None = None):
         self.entries: list[VocabEntry] = entries or []
         self.semantics: dict[str, Any] = semantics or dict(_DEFAULT_SEMANTICS)
         self._build_map: dict[str, str] = {str(k): str(v) for k, v in (build_map or {}).items()}
+        # platform -> newest SDK version harvested. Source line numbers come
+        # from the newest ref an entry appears in (83-94% of entries are still
+        # present at that ref), so this is what a `file:line` is accurate FOR.
+        self.harvest_versions: dict[str, str] = dict(harvest_versions or {})
 
     @property
     def build_map(self) -> dict[str, str]:
@@ -319,6 +324,7 @@ class Vocabulary:
         """
         vocab_dir = Path(vocab_dir)
         entries: list[VocabEntry] = []
+        harvest_versions: dict[str, str] = {}
         for filename, platform in (("android.yaml", ANDROID), ("ios.yaml", IOS)):
             path = vocab_dir / filename
             data = _load_yaml(path, f"{platform} vocabulary")
@@ -331,7 +337,11 @@ class Vocabulary:
             if not isinstance(raw_entries, list):
                 log.warning("%s: 'entries' is not a list — ignoring", path)
                 continue
-            meta_platform = str((data.get("meta") or {}).get("platform") or platform)
+            meta = data.get("meta") or {}
+            meta_platform = str(meta.get("platform") or platform)
+            newest = _newest_version(meta.get("harvested_refs") or {})
+            if newest:
+                harvest_versions[meta_platform] = newest
             for i, raw in enumerate(raw_entries):
                 if not isinstance(raw, dict):
                     log.warning("%s: entry %d is not a mapping — skipped", path, i)
@@ -347,7 +357,8 @@ class Vocabulary:
         if semantics is None:
             semantics = dict(_DEFAULT_SEMANTICS)
 
-        vocab = cls(entries=entries, semantics=semantics, build_map=builds)
+        vocab = cls(entries=entries, semantics=semantics, build_map=builds,
+                    harvest_versions=harvest_versions)
         vocab.apply_sources(sources_dir())
         return vocab
 
@@ -378,6 +389,14 @@ class Vocabulary:
                 entry.source = [str(r) for r in (refs if isinstance(refs, list) else [refs])]
                 hits += 1
         return hits
+
+
+def _newest_version(harvested_refs: dict) -> str | None:
+    """Highest version among the harvested refs. "HEAD" carries no version, so
+    it is skipped — the newest TAG is the honest answer."""
+    versions = [_ver_tuple(k) for k in harvested_refs if str(k).upper() != "HEAD"]
+    labels = [(v, k) for v, k in zip(versions, harvested_refs) if v]
+    return max(labels)[1] if labels else None
 
 
 def sources_dir() -> Path | None:
