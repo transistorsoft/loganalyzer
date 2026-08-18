@@ -12,6 +12,8 @@ must be able to police itself from a bare public clone.
 from __future__ import annotations
 
 import gzip
+import json
+import re
 from pathlib import Path
 
 import pytest
@@ -99,3 +101,44 @@ def test_fixtures_still_parse():
         assert source.platform in ("android", "ios"), f"{path.name}: platform lost"
         records = assemble(source.platform, source.text, 2026)
         assert len(records) > 100, f"{path.name}: only {len(records)} records"
+
+
+# ── the npm launcher's pins must track this package ──────────────────────────
+
+NPM = ROOT / "npm"
+PY_PACKAGE_HINT = "transistorsoft-loganalyzer"
+
+
+@pytest.mark.skipif(not NPM.exists(), reason="npm launcher not present")
+def test_npm_launcher_pins_this_version():
+    """`npx @transistorsoft/loganalyzer@X` must actually run X.
+
+    The launcher pins the PyPI version it invokes. If that pin drifts from this
+    package's version, the npm version becomes a lie about what runs — and the
+    two live in the same repo, so nothing but a check keeps them together.
+    """
+    pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    version = re.search(r'^version = "([^"]+)"', pyproject, re.M).group(1)
+
+    pkg = json.loads((NPM / "package.json").read_text(encoding="utf-8"))
+    assert pkg["version"] == version, (
+        f"npm package.json is {pkg['version']}, pyproject is {version}")
+
+    cli = (NPM / "bin" / "cli.js").read_text(encoding="utf-8")
+    pinned = re.search(r'PY_VERSION = "([^"]+)"', cli).group(1)
+    assert pinned == version, (
+        f"cli.js pins {PY_PACKAGE_HINT}=={pinned}, pyproject is {version}")
+
+    pkg_name = re.search(r'PY_PACKAGE = "([^"]+)"', cli).group(1)
+    assert pkg_name == re.search(r'^name = "([^"]+)"', pyproject, re.M).group(1)
+
+
+
+@pytest.mark.skipif(not NPM.exists(), reason="npm launcher not present")
+def test_npm_launcher_verifies_what_it_downloads():
+    """It fetches and executes a binary, so the checksum check is not optional."""
+    cli = (NPM / "bin" / "cli.js").read_text(encoding="utf-8")
+    assert "createHash" in cli and "sha256" in cli
+    assert "checksum mismatch" in cli
+    # pinned uv, not "latest" — a moving target defeats the pin above
+    assert re.search(r'UV_VERSION = "\d+\.\d+\.\d+"', cli)

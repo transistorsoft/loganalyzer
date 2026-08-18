@@ -1,0 +1,40 @@
+{
+  "name": "@transistorsoft/loganalyzer",
+  "version": "0.1.1",
+  "description": "Triage Background Geolocation SDK logs — npx launcher for transistorsoft-loganalyzer",
+  "bin": {
+    "loganalyzer": "bin/cli.js"
+  },
+  "files": [
+    "bin",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "background-geolocation",
+    "logs",
+    "triage",
+    "gps",
+    "diagnostics",
+    "react-native",
+    "flutter",
+    "capacitor",
+    "cordova"
+  ],
+  "author": "Transistor Software <chris@transistorsoft.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/transistorsoft/loganalyzer#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/transistorsoft/loganalyzer.git",
+    "directory": "npm"
+  },
+  "bugs": {
+    "url": "https://github.com/transistorsoft/loganalyzer/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
