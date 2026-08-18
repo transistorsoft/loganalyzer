@@ -115,11 +115,11 @@ jobs:
 
       - name: publish
         working-directory: npm
+        # No NODE_AUTH_TOKEN. npm Trusted Publishing is configured on the
+        # package, so authentication is the OIDC token minted by id-token: write
+        # above — exactly like PyPI. Setting an empty NODE_AUTH_TOKEN here would
+        # be worse than omitting it: npm would authenticate as nobody rather
+        # than falling through to OIDC.
+        #
+        # Neither registry in this workflow has a stored credential.
         run: npm publish --provenance --access public
-        env:
-          # The one stored credential in this workflow. npm supports Trusted
-          # Publishing (OIDC) the way PyPI does — configure it on the package's
-          # npmjs.com settings, then delete these two lines and the secret. It
-          # needs the package to already exist, which is why it is not the
-          # starting point here.
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
