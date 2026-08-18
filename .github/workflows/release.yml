@@ -82,9 +82,13 @@ jobs:
           PY
 
       - uses: pypa/gh-action-pypi-publish@release/v1
-        # No `with:` block — it detects OIDC from id-token: write, and attaches
-        # PEP 740 attestations so an installer can verify these artifacts came
-        # from this workflow.
+        with:
+          # A version can never be reused, so a re-run after a LATER job failed
+          # would otherwise die here on "already exists" and never reach the
+          # step that actually needs retrying.
+          skip-existing: true
+        # OIDC is detected from id-token: write, and PEP 740 attestations are
+        # attached so an installer can verify these artifacts came from here.
 
   npm:
     # Separate job, and deliberately AFTER pypi: the launcher pins the PyPI
@@ -99,8 +103,26 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
-          registry-url: "https://registry.npmjs.org"
+          # NO registry-url. It writes an .npmrc containing
+          # _authToken=${NODE_AUTH_TOKEN}, and with no token that authenticates
+          # as nobody — npm reports which as a 404 on PUT, not a 401. Trusted
+          # Publishing needs npm to reach the OIDC exchange instead, so nothing
+          # may pre-empt it with token auth.
+          node-version: "24"
+
+      - name: npm must be new enough for Trusted Publishing
+        run: |
+          # Pin explicitly rather than inheriting whatever the runner image
+          # ships. OIDC publishing needs >= 11.5.1, and on an older npm the
+          # symptom is the same opaque 404 as a bad credential — so assert it
+          # here where the message can say what is actually wrong.
+          npm install -g npm@^11
+          have="$(npm --version)"; need=11.5.1
+          if [ "$(printf '%s\n%s\n' "$need" "$have" | sort -V | head -1)" != "$need" ]; then
+            echo "::error::npm $have cannot use Trusted Publishing (need >= $need)"
+            exit 1
+          fi
+          echo "npm $have"
 
       - name: npm version must match the tag
         if: startsWith(github.ref, 'refs/tags/v')
