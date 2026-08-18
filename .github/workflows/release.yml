@@ -42,6 +42,10 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     permissions:
+      # A job-level block REPLACES the top-level one — anything unlisted becomes
+      # `none`. Without contents: read the job would checkout with a token that
+      # has no repository access, so both must be spelled out here.
+      contents: read
       id-token: write        # mint the OIDC token PyPI verifies
     steps:
       - uses: actions/checkout@v4
