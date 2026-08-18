@@ -8,9 +8,10 @@ Two tiers, checked in order:
    session boundary is preserved exactly, but the route is somewhere nobody has
    been. This is what a public clone runs against.
 
-2. The private corpus — `$LOGANALYZER_FIXTURES`, else `../../tmp` relative to
-   the repo, which is where it lands when this repo is checked out as a
-   submodule of bg-forge. Holds customer captures that can never be published.
+2. A private corpus — `$LOGANALYZER_FIXTURES`, else `../../tmp` relative to the
+   repo, which is where it lands when this repo is vendored into Transistor's
+   monorepo. Holds customer captures that can never be published, so these
+   tests skip anywhere else.
 
 `fixture("car")` returns the best available path, or None so the test skips.
 Names with no committed counterpart (customer-supplied logs) resolve only from

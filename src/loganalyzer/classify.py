@@ -383,9 +383,10 @@ class Vocabulary:
 def sources_dir() -> Path | None:
     """Where to look for the private source sidecars, or None.
 
-    Set LOGANALYZER_SOURCES to a directory holding `<platform>.sources.yaml`.
-    Public installs never set it and never ship the files; bg-forge points it at
-    tools/loganalyzer-forge/sources/ so digests link back to SDK code.
+    Set LOGANALYZER_SOURCES to a directory holding `<platform>.sources.yaml`,
+    mapping vocabulary entry ids to the SDK source line that emits them. That
+    index is only meaningful with the SDK checked out, so it is not shipped:
+    public installs never set this and findings simply carry no source link.
     """
     raw = os.environ.get("LOGANALYZER_SOURCES")
     if not raw:
