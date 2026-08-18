@@ -193,8 +193,18 @@ src/loganalyzer/
 ## Tests
 
 ```bash
-uv run pytest -q
+uv run pytest -q          # the suite
+scripts/preflight.sh      # everything the suite cannot reach
 ```
+
+`preflight.sh` is what to run before tagging. The suite does not exercise
+packaging or resolution, and that is where the failures have actually been: a
+wheel missing its vocabulary still installs and still starts, `uvx <package>`
+needs a console script named after the package, and the npm launcher has to
+resolve its bin from a tarball. It builds the wheel, installs it into a
+throwaway venv, runs both console scripts on a real capture, packs and installs
+the npm launcher against that same wheel, checks the three version pins agree,
+and refuses a version either registry already has. It publishes nothing.
 
 The suite runs against real captures committed under `tests/fixtures/` — real cadence, real
 gaps, real geofence chatter. Their coordinates have been moved by a single rigid transform,

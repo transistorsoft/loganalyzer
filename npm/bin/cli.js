@@ -22,7 +22,7 @@ const path = require("node:path");
 // Pinned so `npx @transistorsoft/loganalyzer@x` is reproducible: a floating
 // Python version would make the npm version a lie about what actually runs.
 const PY_PACKAGE = "transistorsoft-loganalyzer";
-const PY_VERSION = "0.1.3";
+const PY_VERSION = "0.1.4";
 const UV_VERSION = "0.12.5";
 
 const TARGETS = {
@@ -150,11 +150,17 @@ async function resolveUv() {
 
 async function main() {
   const uv = await resolveUv();
+  // LOGANALYZER_FROM overrides what gets installed — a local wheel, a path, any
+  // uv spec. Without it the launcher can only ever be exercised against the
+  // PREVIOUS release, because it pins a version that does not exist until the
+  // release it is part of has already shipped. scripts/preflight.sh points it
+  // at the wheel under test so the npx path is verified before publishing.
+  const from = process.env.LOGANALYZER_FROM || `${PY_PACKAGE}==${PY_VERSION}`;
   const args = [
     "tool",
     "run",
     "--from",
-    `${PY_PACKAGE}==${PY_VERSION}`,
+    from,
     "loganalyzer",
     ...process.argv.slice(2),
   ];
