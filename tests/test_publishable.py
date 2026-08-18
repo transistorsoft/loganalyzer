@@ -174,3 +174,33 @@ def test_existing_output_root_is_never_clobbered(tmp_path):
     protect_output_dir(existing)
     assert (existing / ".gitignore").read_text() == "node_modules/\n"
     assert (existing / "src.txt").read_text() == "keep me"
+
+
+def test_every_written_artifact_is_reported(tmp_path, capsys):
+    """The run must name what it wrote, not just the directory.
+
+    Knowing digest.md is the artifact to quote — and that aliases.local.json
+    un-redacts it — is the whole sharing story. A file that lands on disk with
+    no mention leaves the reader to work it out by browsing.
+    """
+    from loganalyzer.cli import ARTIFACT_NOTES, report_artifacts
+
+    out = tmp_path / "cap"
+    out.mkdir()
+    for name in ("digest.md", "digest.json", "map.html",
+                 "locations.geojson", "aliases.local.json"):
+        (out / name).write_text("x")
+
+    report_artifacts(out, opened=False)
+    reported = capsys.readouterr().err
+
+    for path in sorted(out.iterdir()):
+        assert path.name in reported, f"{path.name} written but never reported"
+
+    # the two claims the workflow actually depends on
+    assert "safe to share" in reported
+    assert "un-redacts digest.md" in reported
+    # and nothing full-precision is described as shareable
+    for name, note in ARTIFACT_NOTES.items():
+        if name != "digest.md":
+            assert "safe to share" not in note, f"{name} must not read as shareable"

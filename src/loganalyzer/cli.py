@@ -58,7 +58,10 @@ def _emit_outputs(source: Source, records, analysis, out_dir: Path, *,
                   want_map: bool = True, want_geojson: bool = False,
                   redact: bool = True, harvest_versions: dict | None = None) -> Path:
     """Write digest(+json+aliases), optional geojson and map for one source.
-    The single emit path shared by every command."""
+    The single emit path shared by every command.
+
+    Sets ``out_dir.written`` — no, returns the dir; callers list it with
+    ``written_artifacts`` so the report cannot drift from what landed."""
     out_dir.mkdir(parents=True, exist_ok=True)
     redactor = Redactor(enabled=redact)
     (out_dir / "digest.md").write_text(
@@ -108,6 +111,35 @@ def protect_output_dir(out_root: Path) -> None:
         "# Not for committing, attaching to an issue, or sharing.\n"
         "*\n",
         encoding="utf-8")
+
+
+# What each artifact is, in the only terms that matter when you are looking at
+# a folder wondering which one you may paste into a public issue.
+ARTIFACT_NOTES = {
+    "digest.md": "redacted — safe to share",
+    "digest.json": "full precision",
+    "map.html": "full precision",
+    "locations.geojson": "full precision",
+    "aliases.local.json": "full precision — un-redacts digest.md",
+}
+
+
+def report_artifacts(out_dir: Path, opened: bool = False) -> None:
+    """List what was actually written, annotated.
+
+    Naming only the directory leaves the reader to discover digest.md by
+    browsing — and the whole workflow depends on knowing that digest.md is the
+    one to quote and aliases.local.json is the one that must not travel with it.
+    """
+    for name in ("digest.md", "digest.json", "map.html", "locations.geojson",
+                 "aliases.local.json"):
+        path = out_dir / name
+        if not path.exists():
+            continue
+        note = ARTIFACT_NOTES.get(name, "")
+        if name == "map.html" and opened:
+            note = "full precision — opened"
+        print(f"      {name:<20} {note}", file=sys.stderr)
 
 
 def open_maps(maps: list[Path]) -> None:
@@ -277,12 +309,10 @@ def _cmd_parse(args: argparse.Namespace) -> int:
             maps.append(out_dir / "map.html")
         n_unknown = sum(1 for r in records if r.klass and r.klass.status == "unknown")
         print(f"{source.path.name}: {len(records)} records, {len(segments)} segment(s), "
-              f"{n_unknown} unknown ({100 * n_unknown / max(len(records), 1):.1f}%) → {out_dir}/",
+              f"{n_unknown} unknown ({100 * n_unknown / max(len(records), 1):.1f}%)",
               file=sys.stderr)
-        # A map nobody looks at is half the point. Name it, and name the flag
-        # that opens it — that is the moment someone wants to know.
-        if want_map and not args.open_browser and (out_dir / "map.html").exists():
-            print(f"  map: {out_dir / 'map.html'}", file=sys.stderr)
+        print(f"  → {out_dir}/", file=sys.stderr)
+        report_artifacts(out_dir, opened=bool(args.open_browser))
         any_output = True
 
     if args.open_browser:
