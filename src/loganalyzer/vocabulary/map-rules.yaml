@@ -32,6 +32,25 @@
 #                    so position carries meaning (12 = launch, 6 = lifecycle)
 #   bulk_hide_above  starts hidden above this many features — routine volume
 #                    should not bury the route on first open
+# Where the time navigator starts. A multi-day capture opened at full span is a
+# wall of markers — every trip, every night, every heartbeat at once. So it opens
+# on the first stretch of real activity instead, and the whole capture is one
+# double-click away.
+#
+# "Real activity" is not a distance heuristic — it is the SDK deciding the device
+# started moving: motionchange with isMoving: true. Everything before the first
+# one is the device sitting still, however many markers it produced.
+#
+#   initial_span_minutes    width of the opening window; 0 = whole capture
+#   lead_minutes            context shown before that first movement, so you see
+#                           how it was parked, not just the departure
+#   min_distance_m          fallback only, for captures with no motionchange at
+#                           all: the first session that travelled at least this
+navigator:
+  initial_span_minutes: 120
+  lead_minutes: 15
+  min_distance_m: 100
+
 layers:
   track:        { label: Track,      kind: line,   glyph: "📍" }
   fixes:        { label: Fixes,      kind: dot,    glyph: "📍" }

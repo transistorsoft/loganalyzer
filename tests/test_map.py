@@ -879,3 +879,47 @@ def test_navigator_component_is_spliced_and_self_contained(car):
     assert '"ended_by":"suspension"' in html.replace(", ", ",")
     # still one self-contained document — OSM tiles remain the only network dep
     assert "<script src" not in html and "<link " not in html
+
+
+# ── where the navigator opens ────────────────────────────────────────────────
+
+@needs_car
+def test_map_opens_on_the_first_movement_not_the_whole_capture(car):
+    """A multi-day capture at full span draws every trip, every night and every
+    heartbeat at once. It opens on the first motionchange with isMoving: true —
+    the SDK deciding the device started moving — rather than on a distance
+    heuristic or a session boundary, because a session can begin hours of
+    stationary chatter before the device actually departs.
+    """
+    from loganalyzer.maprules import load_rules
+    from loganalyzer.sessions import build_sessions
+
+    records, analysis, layers = car
+    html = render_map(layers, title="car", sessions=build_sessions(analysis, records))
+
+    cfg = load_rules().navigator
+    assert cfg["initial_span_minutes"] > 0
+    # the opening window is computed in the page from the same signal the
+    # motionchange layer carries, so both halves must be present
+    assert "function firstMovement()" in html
+    assert 'properties.moving !== true' in html
+    assert "initial: initialWindow(" in html
+
+    moving = [f for f in layers["motionchange"]["features"]
+              if f["properties"].get("moving") is True]
+    assert moving, "fixture must contain a motionchange to anchor on"
+
+
+def test_navigator_accepts_an_opening_window():
+    """The component takes the window as data; deciding WHICH window is the
+    map's job, so the navigator stays free of SDK concepts."""
+    from loganalyzer.emit.navigator import NAV_JS
+
+    assert "opts.initial" in NAV_JS
+    # and it clamps rather than trusting the caller
+    assert "Math.max(T0, opts.initial.a)" in NAV_JS
+    assert "Math.min(T1, opts.initial.b)" in NAV_JS
+    # the navigator must not learn what a motionchange is. ("moving" alone is
+    # not a valid needle — it names the dragged edge of the window in there.)
+    for leak in ("motionchange", "isMoving", "geofence"):
+        assert leak not in NAV_JS, f"navigator leaked a domain concept: {leak}"

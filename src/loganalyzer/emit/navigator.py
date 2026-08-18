@@ -22,6 +22,7 @@ JS API
       events:   [{t, w, sev}],       // histogram bars; sev "error"|"warning"|null
       bands:    [{a, b, tone}],      // shaded spans; tone "alert"|"muted"
       sessions: [{i, a, b, label}],  // the bracket ruler; label is pre-formatted
+      initial:  {a, b},              // opening window; omit for the whole span
       onChange: ({a, b, session, reason}) => {},
     });
 
@@ -102,7 +103,14 @@ function TimeNavigator(opts){
     .map(s => Object.assign({}, s, { a: Math.max(s.a, T0), b: Math.min(s.b, T1) }))
     .filter(s => s.b > s.a);
 
+  // Opening window. A consumer may hand one in (see `initial`); otherwise the
+  // whole capture, which is only readable when the capture is short.
   const win = { a: T0, b: T1 };
+  if (opts.initial && opts.initial.a != null && opts.initial.b != null) {
+    win.a = Math.max(T0, opts.initial.a);
+    win.b = Math.min(T1, opts.initial.b);
+    if (win.b <= win.a) { win.a = T0; win.b = T1; }
+  }
   const MIN_WIN = Math.max(1000, SPAN / 5000);
   let W = 0, H = 0, bins = null, drag = null;
 

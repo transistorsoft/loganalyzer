@@ -74,6 +74,7 @@ def render_map(layers: dict[str, dict], title: str, subtitle: str = "",
             .replace("__ICON_TINT__", _js(dict(_RULES.tints)))
             .replace("__BULK_HIDE__", _js(_RULES.bulk_hide_above()))
             .replace("__PROP_DEFAULTS__", _js(COMPACT_DEFAULTS))
+            .replace("__NAV_CONFIG__", _js(_RULES.navigator))
             .replace("__CLUSTER_THRESHOLD__", str(CLUSTER_THRESHOLD))
             .replace("__SESSIONS__", _js(sessions or []))
             .replace("__NAV_CSS__", NAV_CSS)
@@ -1201,8 +1202,49 @@ function navSessions(){
     const bits = ["session " + s.i + " of " + SESSIONS.length];
     if (s.distance_m >= 100) bits.push((s.distance_m / 1000).toFixed(1) + " km");
     if (s.ended_by) bits.push("ended by " + s.ended_by);
-    return { i: s.i, a: a, b: b, label: bits.join(" · ") };
+    return { i: s.i, a: a, b: b, km: s.distance_m || 0, label: bits.join(" · ") };
   }).filter(Boolean);
+}
+
+// Where to open. A multi-day capture at full span is every trip, every night and
+// every heartbeat drawn at once — unreadable, and the first thing anyone does is
+// scrub. So it opens on the first real activity. The whole capture is one
+// double-click (or `all`) away, and the session ruler shows what else is there.
+//
+// "Real activity" is the SDK deciding the device started moving — the first
+// motionchange with isMoving: true — not a distance or a session boundary. One
+// capture here begins the previous evening and its first session runs for eight
+// minutes of stationary chatter before the device actually departs; anchoring on
+// the session would open on the sitting-still part.
+const NAV_CFG = __NAV_CONFIG__;
+function firstMovement(){
+  let best = null;
+  for (const it of (FEATS["motionchange"] || [])){
+    if (it.t === null || it.f.properties.moving !== true) continue;
+    if (best === null || it.t < best) best = it.t;
+  }
+  return best;
+}
+function initialWindow(sessions){
+  const minutes = NAV_CFG.initial_span_minutes;
+  if (!minutes) return null;                              // 0 = whole capture
+  const lead = (NAV_CFG.lead_minutes || 0) * 60000;
+  let start = null;
+
+  const moved = firstMovement();
+  if (moved !== null){
+    // Step back to the session enclosing it — that is the gap this activity
+    // started after — but never further than the lead, or a session that began
+    // hours earlier would open on all the stationary time before departure.
+    const owner = sessions.find(s => moved >= s.a && moved <= s.b);
+    start = Math.max(owner ? owner.a : T0, moved - lead);
+  } else if (sessions.length){
+    // No motionchange anywhere: fall back to the first session that travelled.
+    const minM = NAV_CFG.min_distance_m || 0;
+    start = (sessions.find(s => s.km >= minM) || sessions[0]).a;
+  }
+  if (start === null) return null;
+  return { a: start, b: Math.min(start + minutes * 60000, T1) };
 }
 
 function windowStats(){
@@ -1236,6 +1278,7 @@ if (HAS_TIME){
     canvas: document.getElementById("navcv"),
     t0: T0, t1: T1,
     events: navEvents(), bands: navBands(), sessions: navSessions(),
+    initial: initialWindow(navSessions()),
     onChange: change => {
       popup.style.display = "none";   // the marker behind it may have just left
       if (change.reason === "session" || change.reason === "reset"){

@@ -71,6 +71,7 @@ class MapRules:
     suppress: list[Suppression] = field(default_factory=list)
     tints: dict[str, str] = field(default_factory=dict)
     geofence_actions: dict[str, str] = field(default_factory=dict)
+    navigator: dict = field(default_factory=dict)
 
     # ── per-layer lookups ────────────────────────────────────────────────────
     # `layers` is the single definition of everything per-layer, key order
@@ -165,4 +166,5 @@ def load_rules(path: Path | None = None) -> MapRules:
         suppress=suppress,
         tints=doc.get("tints", {}) or {},
         geofence_actions=doc.get("geofence_actions", {}) or {},
+        navigator=doc.get("navigator", {}) or {},
     )
